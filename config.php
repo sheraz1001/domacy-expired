@@ -47,4 +47,13 @@ return [
     'ae_crt_queries_per_run' => (int)$env('AE_CRT_QUERIES_PER_RUN', 8),
     'deleted_keep_days' => (int)$env('DELETED_KEEP_DAYS', 30),
     'cron_key' => '',
+
+    // Email (sign-in links and daily alerts). Use a mailbox such as alerts@domacy.com.
+    'smtp_host' => $env('SMTP_HOST', ''),
+    'smtp_port' => (int)$env('SMTP_PORT', 465),
+    'smtp_secure' => $env('SMTP_SECURE', 'ssl'),          // ssl (465) or tls (587)
+    'smtp_user' => $env('SMTP_USER', ''),
+    'smtp_pass' => $env('SMTP_PASS', ''),
+    'mail_from' => $env('MAIL_FROM', 'alerts@domacy.com'),
+    'mail_from_name' => $env('MAIL_FROM_NAME', 'Domacy Expired Domains'),
 ];

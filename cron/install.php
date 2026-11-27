@@ -65,6 +65,43 @@ $stmts = [
   dropped_on DATE NULL,
   checked_at DATETIME NULL
 )$engine",
+"CREATE TABLE IF NOT EXISTS users (
+  id $pk,
+  email VARCHAR(190) NOT NULL UNIQUE,
+  created_at DATETIME NOT NULL,
+  last_login DATETIME NULL,
+  alerts_on TINYINT NOT NULL DEFAULT 1,
+  unsub_token VARCHAR(64) NOT NULL
+)$engine",
+"CREATE TABLE IF NOT EXISTS login_tokens (
+  id $pk,
+  token_hash VARCHAR(64) NOT NULL UNIQUE,
+  email VARCHAR(190) NOT NULL,
+  ip VARCHAR(45) NOT NULL,
+  return_to VARCHAR(500) NULL,
+  created_at DATETIME NOT NULL,
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL
+)$engine",
+"CREATE TABLE IF NOT EXISTS saved_searches (
+  id $pk,
+  user_id INT NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  tab VARCHAR(16) NOT NULL,
+  params TEXT NOT NULL,
+  alert TINYINT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL,
+  last_alert_at DATETIME NULL
+)$engine",
+"CREATE TABLE IF NOT EXISTS watchlist (
+  id $pk,
+  user_id INT NOT NULL,
+  domain VARCHAR(253)$asc NOT NULL,
+  created_at DATETIME NOT NULL,
+  last_state VARCHAR(40) NULL,
+  last_alert_at DATETIME NULL,
+  UNIQUE (user_id, domain)
+)$engine",
 "CREATE TABLE IF NOT EXISTS import_log (
   id $pk,
   source VARCHAR(40) NOT NULL,
@@ -76,10 +113,19 @@ $stmts = [
 $indexes = [
     'auctions' => ['list_type,tld', 'list_type,end_time', 'list_type,tf', 'list_type,semrush_as', 'list_type,price', 'list_type,sld_len', 'batch'],
     'deleted_domains' => ['dropped_on,tld', 'status', 'sld_len', 'tld'],
+    'login_tokens' => ['email,created_at', 'ip,created_at'],
+    'saved_searches' => ['user_id'],
+    'watchlist' => ['domain'],
     'ae_domains' => ['status,checked_at', 'checked_at', 'dropped_on', 'tld'],
 ];
 
 foreach ($stmts as $s) db()->exec($s);
+
+// Migrations for tables created by older versions
+$migrations = [
+    'ALTER TABLE auctions ADD COLUMN first_seen DATE NULL',
+];
+foreach ($migrations as $m) { try { db()->exec($m); } catch (PDOException $e) { /* already applied */ } }
 foreach ($indexes as $table => $list) {
     foreach ($list as $cols) {
         $name = 'ix_' . $table . '_' . str_replace(',', '_', $cols);

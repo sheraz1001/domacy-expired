@@ -72,6 +72,9 @@ foreach ($files as $type => $file) {
     db()->commit();
     $zip->close();
 
+    // Remember when each listing first appeared (for "new since yesterday" alerts)
+    db()->prepare('UPDATE auctions SET first_seen = ? WHERE list_type = ? AND first_seen IS NULL')->execute([gmdate('Y-m-d'), $type]);
+
     // Remove listings that are no longer in today's file
     $del = db()->prepare('DELETE FROM auctions WHERE list_type = ? AND batch <> ?');
     $del->execute([$type, $batch]);

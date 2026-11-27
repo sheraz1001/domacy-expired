@@ -1,11 +1,11 @@
 #!/bin/sh
 set -e
 cd /var/www/html
-mkdir -p data/logs data/cache data/zones data/godaddy
+mkdir -p data/logs data/cache data/zones data/godaddy data/sessions
 cp -n docker/data.htaccess data/.htaccess 2>/dev/null || true
 
 # Make settings from Coolify visible to cron jobs (cron starts with an empty environment)
-php -r '$k=["SITE_NAME","SITE_URL","MAIN_SITE","ALLOW_INDEXING","DB_DSN","DB_USER","DB_PASS","DATA_DIR","CZDS_USERNAME","CZDS_PASSWORD","CZDS_ZONES","RDAP_PER_RUN","RDAP_DELAY_MS","DELETED_KEEP_DAYS"];$o=[];foreach($k as $x){$v=getenv($x);if($v!==false)$o[$x]=$v;}file_put_contents("data/env.json",json_encode($o));'
+php -r '$k=["SITE_NAME","SITE_URL","MAIN_SITE","ALLOW_INDEXING","DB_DSN","DB_USER","DB_PASS","DATA_DIR","CZDS_USERNAME","CZDS_PASSWORD","CZDS_ZONES","RDAP_PER_RUN","RDAP_DELAY_MS","DELETED_KEEP_DAYS","RDAP_PARALLEL","AE_WHOIS_HOST","AE_WHOIS_PER_RUN","AE_WHOIS_DELAY_MS","AE_CRT_QUERIES_PER_RUN","SMTP_HOST","SMTP_PORT","SMTP_SECURE","SMTP_USER","SMTP_PASS","MAIL_FROM","MAIL_FROM_NAME"];$o=[];foreach($k as $x){$v=getenv($x);if($v!==false)$o[$x]=$v;}file_put_contents("data/env.json",json_encode($o));'
 chmod 600 data/env.json
 chown -R www-data:www-data data
 

@@ -11,6 +11,10 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # .ae watch list: collect names hourly, check them at the .ae registry every 5 minutes
 15 * * * * www-data cd /var/www/html && flock -n /tmp/ae_seed.lock php cron/ae_seed.php >> data/logs/ae.log 2>&1
 */5 * * * * www-data cd /var/www/html && flock -n /tmp/ae_whois.lock php cron/ae_whois.php >> data/logs/ae.log 2>&1
+# Daily alert emails at 08:00 UTC (12:00 UAE)
+0 8 * * * www-data cd /var/www/html && flock -n /tmp/alerts.lock php cron/send_alerts.php >> data/logs/alerts.log 2>&1
+# Remove old sign-in links and sessions
+20 3 * * * www-data cd /var/www/html && php cron/cleanup.php >> data/logs/cleanup.log 2>&1
 # Keep logs small
 0 3 * * 0 www-data cd /var/www/html/data/logs && for f in *.log; do tail -n 5000 "$f" > "$f.tmp" && mv "$f.tmp" "$f"; done
 

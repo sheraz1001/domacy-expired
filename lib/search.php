@@ -141,3 +141,72 @@ function site_stats(): array
     return $s;
 }
 
+
+/** Query-string keys that make up a saved search. */
+const SAVED_PARAMS = ['tab', 'q', 'match', 'tld', 'minlen', 'maxlen', 'nodigits', 'nohyphen', 'status', 'view',
+    'min_as', 'min_tf', 'min_bl', 'min_rd', 'min_age', 'min_sv', 'max_price', 'ending'];
+
+/** Human description of a saved search, e.g. "Deleted domains · contains "dubai" · .com · no numbers". */
+function search_label(array $p): string
+{
+    $tab = isset(TABS[$p['tab'] ?? '']) ? $p['tab'] : 'deleted';
+    $bits = [TABS[$tab]['label']];
+    if (($p['q'] ?? '') !== '') {
+        $m = ['starts' => 'starts with', 'ends' => 'ends with', 'exact' => 'exactly'][$p['match'] ?? ''] ?? 'contains';
+        $bits[] = $m . ' "' . $p['q'] . '"';
+    }
+    if (($p['tld'] ?? '') !== '') $bits[] = '.' . $p['tld'];
+    if (($p['minlen'] ?? '') !== '' || ($p['maxlen'] ?? '') !== '') $bits[] = 'length ' . ($p['minlen'] ?? '1') . '–' . ($p['maxlen'] ?? '∞');
+    if (!empty($p['nodigits'])) $bits[] = 'no numbers';
+    if (!empty($p['nohyphen'])) $bits[] = 'no hyphens';
+    if (($p['status'] ?? '') === 'available') $bits[] = 'available only';
+    if (($p['min_as'] ?? '') !== '') $bits[] = 'authority ≥ ' . $p['min_as'];
+    if (($p['max_price'] ?? '') !== '') $bits[] = 'price ≤ $' . $p['max_price'];
+    return implode(' · ', $bits);
+}
+
+/**
+ * Where a domain currently appears in our data, e.g. "deleted:available", "auction:expiring",
+ * "ae:pending", or "none". Used by the watchlist to spot changes.
+ */
+function domain_state(string $domain): string
+{
+    $q = db()->prepare('SELECT status FROM deleted_domains WHERE domain = ?');
+    $q->execute([$domain]);
+    if ($s = $q->fetchColumn()) return "deleted:$s";
+    $q = db()->prepare('SELECT list_type FROM auctions WHERE domain = ? ORDER BY list_type DESC LIMIT 1');
+    $q->execute([$domain]);
+    if ($s = $q->fetchColumn()) return "auction:$s";
+    if (str_ends_with($domain, '.ae')) {
+        $q = db()->prepare('SELECT status FROM ae_domains WHERE domain = ?');
+        $q->execute([$domain]);
+        if (($s = $q->fetchColumn()) && $s !== 'unknown') return "ae:$s";
+    }
+    return 'none';
+}
+
+/** Plain-English description of a domain state for emails and the account page. */
+function state_label(string $state): string
+{
+    return [
+        'deleted:available' => 'Deleted and available to register',
+        'deleted:unknown' => 'Deleted (checking availability)',
+        'deleted:registered' => 'Deleted, then registered again',
+        'deleted:no_rdap' => 'Deleted',
+        'auction:expiring' => 'Expired and in auction',
+        'auction:closeout' => 'Expired and for sale as a closeout',
+        'ae:pending' => 'Pending delete at the .ae registry',
+        'ae:available' => 'Free to register',
+        'ae:registered' => 'Registered',
+        'none' => 'Registered (not expiring)',
+    ][$state] ?? $state;
+}
+
+function flash(?string $msg = null): ?string
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) return null;
+    if ($msg !== null) { $_SESSION['flash'] = $msg; return null; }
+    $m = $_SESSION['flash'] ?? null;
+    unset($_SESSION['flash']);
+    return $m;
+}

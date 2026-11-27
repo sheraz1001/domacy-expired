@@ -151,3 +151,36 @@ td.links{display:flex;gap:8px;justify-content:flex-end}
 .seo-faq details{border:1px solid var(--mist);border-radius:14px;padding:14px 16px;margin-bottom:10px;background:#fff}
 .seo-faq summary{cursor:pointer;font-weight:700;font-size:15px;color:var(--ink)}
 .seo-faq details p{margin:10px 0 0;font-size:14.5px}
+
+/* Accounts, saved searches, watchlist */
+.star-form,.inline-form{display:inline}
+.star{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin:0 6px 0 -4px;border:0;background:none;color:var(--steel);font-size:18px;line-height:1;cursor:pointer;border-radius:999px;vertical-align:-3px;padding:0}
+.star:hover{color:#e6a700;background:var(--cloud);text-decoration:none}
+.star.on{color:#e6a700}
+.save-btn{margin-right:4px}
+.flash{background:var(--okbg);color:var(--ok);font-weight:600;padding:10px 16px;border-radius:12px;margin:0 0 14px}
+.hero-sm .hero-inner{padding:56px 0 64px}
+.auth-card{max-width:520px}
+.auth-h{margin:0 0 8px;font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.25}
+.auth-p{margin:0 0 14px;color:var(--ink)}
+.auth-p.muted,.muted{color:var(--slate)}
+.auth-p.small{font-size:13px;margin-top:14px}
+.auth-err{background:#fdecec;color:#a4262c;padding:10px 14px;border-radius:12px;font-weight:600}
+.auth-form{display:grid;gap:10px}
+.auth-form .searchbox input{padding-left:16px}
+.btn-search.inline{display:inline-flex;align-items:center;text-decoration:none}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.acct{padding-top:40px}
+.acct-box{border:1px solid var(--mist);border-radius:18px;padding:18px 20px;margin-bottom:28px}
+.acct-row{display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.acct-row h3,.acct-h{margin:0 0 4px;font-size:18px;font-weight:800}
+.acct-row p{margin:0;max-width:720px}
+.acct-h{margin:30px 0 10px}
+td.wrap{white-space:normal}
+.watch-add{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 16px}
+.watch-add .searchbox input{padding-left:16px;font-size:15px}
+.acct-danger{margin-top:36px}
+.link-danger{background:none;border:0;color:#a4262c;font:inherit;font-weight:600;cursor:pointer;padding:0;text-decoration:underline}
+button.act{border:0;cursor:pointer;font-family:inherit}
+button.act.ghost{border:1px solid var(--mist)}
+button.btn-outline{background:#fff;font-family:inherit;cursor:pointer}

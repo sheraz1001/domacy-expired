@@ -2,6 +2,7 @@
 require __DIR__ . '/../lib/bootstrap.php';
 require __DIR__ . '/../lib/search.php';
 require __DIR__ . '/../lib/seo.php';
+require __DIR__ . '/../lib/auth.php';
 
 $tab = current_tab();
 $table = TABS[$tab]['table'];
@@ -34,6 +35,20 @@ $total = (int)$cnt->fetchColumn();
 $stmt = db()->prepare("SELECT * FROM $table $where ORDER BY $order LIMIT $perPage OFFSET $offset");
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
+
+// Signed-in visitor: which of the shown domains are on their watchlist
+$user = current_user();
+$watched = [];
+if ($user && $rows) {
+    $doms = array_column($rows, 'domain');
+    $wq = db()->prepare('SELECT domain FROM watchlist WHERE user_id = ? AND domain IN (' . implode(',', array_fill(0, count($doms), '?')) . ')');
+    $wq->execute(array_merge([(int)$user['id']], $doms));
+    $watched = array_flip($wq->fetchAll(PDO::FETCH_COLUMN));
+}
+$csrf = $user ? csrf_token() : '';
+if ($user) header('Cache-Control: private, no-store');
+$flash = $user ? flash() : null;
+$here = '/' . ltrim((string)($_SERVER['REQUEST_URI'] ?? '/'), '/');
 $pages = max(1, min(500, (int)ceil($total / $perPage)));
 $tlds = top_tlds($tab);
 $isDel = $tab === 'deleted';
@@ -53,6 +68,16 @@ function th(string $key, string $label, string $title = ''): string
     if ($cur !== $key && in_array($key, ['domain', 'len', 'price', 'end', 'tld'])) $next = 'asc';
     $arrow = $cur === $key ? ($dir === 'asc' ? ' ↑' : ' ↓') : '';
     return '<th><a class="' . ($cur === $key ? 'cur' : '') . '" href="' . h(url_with(['sort' => $key, 'dir' => $next, 'page' => null])) . '" title="' . h($title) . '">' . h($label) . $arrow . '</a></th>';
+}
+function star_btn(string $domain, bool $on, bool $loggedIn, string $csrf, string $here): string
+{
+    if (!$loggedIn) {
+        return '<a class="star" href="login.php?return=' . h(rawurlencode($here)) . '" title="Sign in to watch this domain" rel="nofollow">☆</a>';
+    }
+    return '<form method="post" action="action.php" class="star-form"><input type="hidden" name="csrf" value="' . h($csrf) . '">'
+        . '<input type="hidden" name="do" value="' . ($on ? 'unwatch' : 'watch') . '"><input type="hidden" name="domain" value="' . h($domain) . '">'
+        . '<input type="hidden" name="back" value="' . h($here) . '">'
+        . '<button type="submit" class="star' . ($on ? ' on' : '') . '" title="' . ($on ? 'On your watchlist' : 'Add to watchlist') . '">' . ($on ? '★' : '☆') . '</button></form>';
 }
 function num($n): string { return $n === null ? '–' : number_format((float)$n); }
 function ago(?string $t): string
@@ -86,7 +111,7 @@ $indexable = seo_indexable();
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=5">
+<link rel="stylesheet" href="assets/style.css?v=6">
 </head>
 <body>
 <header class="site-header">
@@ -99,9 +124,9 @@ $indexable = seo_indexable();
       <a href="./">Deleted</a>
       <a href="?tab=expiring">Auctions</a>
       <a href="?tab=closeout">Closeouts</a>
+      <a href="?tab=ae">.ae</a>
       <a href="<?= h($main) ?>/guides">Guides</a>
-      <a href="<?= h($main) ?>/whois">WHOIS</a>
-      <a href="<?= h($main) ?>/pricing">Domain prices</a>
+      <?php if ($user): ?><a href="account.php">My account</a><?php else: ?><a href="login.php?return=<?= h(rawurlencode($here)) ?>">Sign in</a><?php endif; ?>
       <a class="btn-pill" href="<?= h($main) ?>/">Register a domain</a>
     </nav>
     <button class="menu-btn" aria-label="Menu" onclick="document.getElementById('nav').classList.toggle('open')">
@@ -193,10 +218,20 @@ $indexable = seo_indexable();
         <p><?= h(TABS[$tab]['hint']) ?> Last updated <?= h(ago($lastUpd)) ?>.</p>
       </div>
       <span class="spacer"></span>
+      <?php if ($user): ?>
+        <form method="post" action="action.php" class="inline-form">
+          <input type="hidden" name="csrf" value="<?= h($csrf) ?>"><input type="hidden" name="do" value="save_search">
+          <input type="hidden" name="back" value="<?= h(url_with(['tab' => $tab, 'page' => null, 'sort' => null, 'dir' => null])) ?>">
+          <button type="submit" class="btn-outline save-btn">🔔 Save this search</button>
+        </form>
+      <?php else: ?>
+        <a class="btn-outline save-btn" href="login.php?return=<?= h(rawurlencode($here)) ?>" rel="nofollow">🔔 Save this search</a>
+      <?php endif; ?>
       <a class="btn-outline" href="<?= h(url_with(['export' => 'csv', 'page' => null])) ?>" rel="nofollow">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 20h14"/></svg> Download CSV</a>
     </div>
 
+    <?php if ($flash): ?><p class="flash"><?= h($flash) ?></p><?php endif; ?>
     <div class="tablecard"><div class="tablewrap">
       <table>
         <thead><tr>
@@ -218,7 +253,7 @@ $indexable = seo_indexable();
         <?php endif; ?>
         <?php foreach ($rows as $r): $d = $r['domain']; [$sld, $tl] = split_domain($d); ?>
           <tr>
-            <td class="dom"><?= h($sld) ?><span class="t">.<?= h($tl) ?></span></td>
+            <td class="dom"><?= star_btn($d, isset($watched[$d]), $user !== null, $csrf, $here) ?><?= h($sld) ?><span class="t">.<?= h($tl) ?></span></td>
             <td class="mut"><?= (int)$r['sld_len'] ?></td>
             <?php if ($isAe):
                 $lbl = ['available' => $r['dropped_on'] ? 'Just released' : 'Available', 'pending' => 'Pending delete', 'registered' => 'Registered', 'unknown' => 'Not checked'][$r['status']] ?? $r['status'];
@@ -326,5 +361,21 @@ $indexable = seo_indexable();
     </div>
   </div>
 </footer>
+<script>
+// Watchlist stars without reloading the page
+document.querySelectorAll('.star-form').forEach(function (f) {
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(f); fd.append('ajax', '1');
+    var btn = f.querySelector('button'), doIn = f.querySelector('[name=do]');
+    fetch('action.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) return;
+      btn.classList.toggle('on', j.watching); btn.textContent = j.watching ? '★' : '☆';
+      btn.title = j.watching ? 'On your watchlist' : 'Add to watchlist';
+      doIn.value = j.watching ? 'unwatch' : 'watch';
+    }).catch(function () { f.submit(); });
+  });
+});
+</script>
 </body>
 </html>
