@@ -1,0 +1,7 @@
+.git
+data/*.sqlite*
+data/zones
+data/godaddy
+data/cache
+data/logs
+data/env.json

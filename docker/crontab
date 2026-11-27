@@ -1,0 +1,12 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# All times UTC.
+# ICANN zone files are ready after 06:00 UTC -> build the "Deleted" list
+30 7 * * * www-data cd /var/www/html && flock -n /tmp/czds.lock php cron/czds_deleted.php >> data/logs/czds.log 2>&1
+# GoDaddy inventory files refresh around 14:40 UTC
+30 15 * * * www-data cd /var/www/html && flock -n /tmp/godaddy.lock php cron/import_godaddy.php >> data/logs/godaddy.log 2>&1
+# Availability checks for deleted names
+*/15 * * * * www-data cd /var/www/html && flock -n /tmp/rdap.lock php cron/check_rdap.php >> data/logs/rdap.log 2>&1
+# Keep logs small
+0 3 * * 0 www-data cd /var/www/html/data/logs && for f in *.log; do tail -n 5000 "$f" > "$f.tmp" && mv "$f.tmp" "$f"; done
+
