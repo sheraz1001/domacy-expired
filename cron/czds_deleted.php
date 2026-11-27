@@ -25,6 +25,13 @@ if (empty($args['local'])) {
     logmsg('Approved zones available: ' . count($links));
 }
 
+if ($zones === ['all']) {
+    // Every approved zone; biggest/most popular first so they are ready earliest
+    $first = ['com', 'net', 'org', 'info', 'xyz', 'online', 'shop', 'store', 'site', 'top', 'biz', 'app', 'dev', 'pro', 'club', 'live', 'tech'];
+    $all = array_keys($links);
+    sort($all);
+    $zones = array_values(array_unique(array_merge(array_intersect($first, $all), $all)));
+}
 $pending = array_filter($zones, fn($t) => !is_file("$dir/$t.$today.txt") && (empty($links) || isset($links[$t])));
 if (!$pending) { logmsg('All approved zones already done today.'); exit(0); }
 foreach ($pending as $tld) {

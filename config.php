@@ -25,7 +25,7 @@ return [
     // ICANN CZDS login (https://czds.icann.org)
     'czds_username' => $env('CZDS_USERNAME', ''),
     'czds_password' => $env('CZDS_PASSWORD', ''),
-    'czds_zones' => array_filter(array_map('trim', explode(',', $env('CZDS_ZONES', 'com,net,org,info,biz,xyz,online,shop,store,site,top,app,dev,pro,club,live,tech,space,website,io')))),
+    'czds_zones' => array_filter(array_map('trim', explode(',', $env('CZDS_ZONES', 'all')))),
 
     // GoDaddy Auctions free inventory files (https://inventory.auctions.godaddy.com/)
     'godaddy_files' => [
@@ -34,8 +34,10 @@ return [
     ],
     'godaddy_skip_adult' => true,
 
-    'rdap_per_run' => (int)$env('RDAP_PER_RUN', 400),
-    'rdap_delay_ms' => (int)$env('RDAP_DELAY_MS', 250),
+    // 'all' = every zone ICANN has approved for this account
+    'rdap_per_run' => (int)$env('RDAP_PER_RUN', 4000),      // names checked per run (runs every 5 min)
+    'rdap_parallel' => (int)$env('RDAP_PARALLEL', 12),      // requests in flight at once
+    'rdap_delay_ms' => (int)$env('RDAP_DELAY_MS', 0),
     'deleted_keep_days' => (int)$env('DELETED_KEEP_DAYS', 30),
     'cron_key' => '',
 ];
