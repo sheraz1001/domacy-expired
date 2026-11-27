@@ -51,6 +51,7 @@ function czds_login(): string
         CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
         CURLOPT_POSTFIELDS => json_encode(['username' => config('czds_username'), 'password' => config('czds_password')]),
         CURLOPT_TIMEOUT => 60,
+        CURLOPT_USERAGENT => 'DomacyExpired/1.0 (+https://expired.domacy.com)', // required by ICANN, else redirected to maintenance
     ]);
     $body = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);

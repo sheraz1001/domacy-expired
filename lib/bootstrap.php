@@ -103,7 +103,7 @@ function http_get(string $url, array $headers = [], ?string $saveTo = null, int 
     $opts = [
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_USERAGENT => 'DropList/1.0 (+expired domain research)',
+        CURLOPT_USERAGENT => 'DomacyExpired/1.0 (+https://expired.domacy.com)',
         CURLOPT_CONNECTTIMEOUT => 20,
         CURLOPT_TIMEOUT => $timeout,
     ];
