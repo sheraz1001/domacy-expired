@@ -1,8 +1,9 @@
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # All times UTC.
-# ICANN zone files are ready after 06:00 UTC -> build the "Deleted" list
-30 7 * * * www-data cd /var/www/html && flock -n /tmp/czds.lock php cron/czds_deleted.php >> data/logs/czds.log 2>&1
+# ICANN zone files are ready after 06:00 UTC -> build the "Deleted" list.
+# Runs hourly so it retries if ICANN is down; zones already done today are skipped.
+30 6-23 * * * www-data cd /var/www/html && flock -n /tmp/czds.lock php cron/czds_deleted.php >> data/logs/czds.log 2>&1
 # GoDaddy inventory files refresh around 14:40 UTC
 30 15 * * * www-data cd /var/www/html && flock -n /tmp/godaddy.lock php cron/import_godaddy.php >> data/logs/godaddy.log 2>&1
 # Availability checks for deleted names

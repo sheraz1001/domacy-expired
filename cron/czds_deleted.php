@@ -25,7 +25,9 @@ if (empty($args['local'])) {
     logmsg('Approved zones available: ' . count($links));
 }
 
-foreach ($zones as $tld) {
+$pending = array_filter($zones, fn($t) => !is_file("$dir/$t.$today.txt") && (empty($links) || isset($links[$t])));
+if (!$pending) { logmsg('All approved zones already done today.'); exit(0); }
+foreach ($pending as $tld) {
     try {
         process_zone($tld, $links[$tld] ?? null, $token ?? '', $dir, $today, $args['local'] ?? null);
     } catch (Throwable $e) {
@@ -54,8 +56,12 @@ function czds_login(): string
     $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
     curl_close($ch);
     $tok = json_decode((string)$body, true)['accessToken'] ?? null;
+    if ($code === 301 || $code === 302 || $code === 503) {
+        logmsg("ICANN API is in maintenance (HTTP $code) - will retry next hour.");
+        exit(0);
+    }
     if ($code !== 200 || !$tok) {
-        logmsg("CZDS login failed (HTTP $code). Check czds_username / czds_password in config.php");
+        logmsg("CZDS login failed (HTTP $code). Check CZDS_USERNAME / CZDS_PASSWORD in Coolify.");
         exit(1);
     }
     return $tok;
