@@ -14,7 +14,7 @@ return [
     'site_name' => $env('SITE_NAME', 'Domacy Expired'),
     'site_url' => rtrim($env('SITE_URL', 'https://expired.domacy.com'), '/'),
     'main_site' => rtrim($env('MAIN_SITE', 'https://domacy.com'), '/'),
-    'allow_indexing' => $env('ALLOW_INDEXING', '0') === '1',
+    'allow_indexing' => $env('ALLOW_INDEXING', '1') === '1',
 
     'db_dsn'  => $env('DB_DSN', 'sqlite:' . __DIR__ . '/data/app.sqlite'),
     'db_user' => $env('DB_USER'),

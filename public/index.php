@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/../lib/bootstrap.php';
 require __DIR__ . '/../lib/search.php';
+require __DIR__ . '/../lib/seo.php';
 
 $tab = current_tab();
 $table = TABS[$tab]['table'];
@@ -61,20 +62,29 @@ function ago(?string $t): string
     return intdiv($s, 86400) . ' days ago';
 }
 $check = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-$title = ['deleted' => 'Deleted domains available to register', 'expiring' => 'Expiring domain auctions', 'closeout' => 'Closeout domains from $5'][$tab];
+$seoTld = seo_tld();
+$title = seo_title($tab, $seoTld);
+$indexable = seo_indexable();
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= h($title) ?> | Domacy Expired Domains</title>
-<meta name="description" content="Free expired domain search: deleted domains, expiring auctions and closeouts, updated every day with Semrush authority, age and backlinks. Register available names at Domacy.">
-<?php if (!config('allow_indexing')): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
-<link rel="canonical" href="<?= h(config('site_url') . '/?tab=' . $tab) ?>">
+<title><?= h($title) ?> | Domacy</title>
+<meta name="description" content="<?= h(seo_description($tab, $seoTld)) ?>">
+<?php if (!config('allow_indexing')): ?><meta name="robots" content="noindex, nofollow"><?php elseif (!$indexable): ?><meta name="robots" content="noindex, follow"><?php else: ?><meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large"><?php endif; ?>
+<link rel="canonical" href="<?= h(seo_url($tab, $seoTld)) ?>">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Domacy Expired Domains">
+<meta property="og:title" content="<?= h($title) ?>">
+<meta property="og:description" content="<?= h(seo_description($tab, $seoTld)) ?>">
+<meta property="og:url" content="<?= h(seo_url($tab, $seoTld)) ?>">
+<meta name="twitter:card" content="summary">
+<?= seo_jsonld($tab, $seoTld) ?>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=4">
+<link rel="stylesheet" href="assets/style.css?v=5">
 </head>
 <body>
 <header class="site-header">
@@ -84,9 +94,10 @@ $title = ['deleted' => 'Deleted domains available to register', 'expiring' => 'E
       <span class="sub">Expired domains</span>
     </a>
     <nav class="nav" id="nav">
-      <a href="?tab=deleted">Deleted</a>
+      <a href="./">Deleted</a>
       <a href="?tab=expiring">Auctions</a>
       <a href="?tab=closeout">Closeouts</a>
+      <a href="<?= h($main) ?>/guides">Guides</a>
       <a href="<?= h($main) ?>/whois">WHOIS</a>
       <a href="<?= h($main) ?>/pricing">Domain prices</a>
       <a class="btn-pill" href="<?= h($main) ?>/">Register a domain</a>
@@ -101,14 +112,14 @@ $title = ['deleted' => 'Deleted domains available to register', 'expiring' => 'E
   <div class="hero-bg"><div class="hero-glow g1"></div><div class="hero-glow g2"></div><div class="hero-glow g3"></div><div class="hero-grid"></div></div>
   <div class="container hero-inner">
     <span class="badge"><i></i><?= num($stats['deleted'] + $stats['expiring'] + $stats['closeout']) ?> domains · updated daily · free</span>
-    <h1>Find <span class="grad">expired domains</span>.</h1>
+    <h1><?= seo_h1($tab, $seoTld) ?></h1>
     <p class="lead">Deleted names you can register today, plus expiring auctions with authority, age and backlinks. Search them all at once.</p>
 
     <form class="card" method="get" action="./">
       <div class="card-top">
         <div class="chips" role="tablist">
           <?php foreach (TABS as $k => $t): ?>
-            <a class="chip <?= $k === $tab ? 'on' : '' ?>" href="?tab=<?= $k ?>"><?= h($t['label']) ?> <span class="n"><?= num($stats[$k]) ?></span></a>
+            <a class="chip <?= $k === $tab ? 'on' : '' ?>" href="<?= $k === 'deleted' ? './' : '?tab=' . $k ?>"><?= h($t['label']) ?> <span class="n"><?= num($stats[$k]) ?></span></a>
           <?php endforeach; ?>
         </div>
         <input type="hidden" name="tab" value="<?= h($tab) ?>">
@@ -246,6 +257,31 @@ $title = ['deleted' => 'Deleted domains available to register', 'expiring' => 'E
   </div>
 </section>
 
+<section class="seo">
+  <div class="container seo-grid">
+    <div class="seo-main">
+      <h2>Popular expired domain endings</h2>
+      <p class="seo-lead">Browse <?= h(strtolower(TABS[$tab]['label'])) ?> by ending. Each list is updated every day.</p>
+      <ul class="tldlinks">
+        <?php foreach (array_slice($tlds, 0, SEO_TLD_PAGES, true) as $t => $c): ?>
+          <li><a href="?<?= h(http_build_query(['tab' => $tab, 'tld' => $t])) ?>">Expired .<?= h($t) ?> domains <span><?= num($c) ?></span></a></li>
+        <?php endforeach; ?>
+      </ul>
+
+      <h2>About expired domains</h2>
+      <p>Every day thousands of domain names reach the end of their registration and are not renewed. After a grace period and a redemption period, the registry deletes them and they become free to register again. Domacy Expired Domains lists those <strong>deleted domains</strong> the morning they drop, along with <strong>expiring domain auctions</strong> and <strong>closeout domains</strong> you can buy before they are deleted.</p>
+      <p>People look for expired domains for a short name that was out of reach, for a brand that matches their business, or for a name that already has links and visitors. Use the filters for length, numbers, hyphens, authority, referring domains, age and search volume to find the good ones, and always check a name’s history before you build on it.</p>
+      <p>Learn more in our guides: <a href="<?= h($main) ?>/guides/what-happens-when-a-domain-expires">what happens when a domain expires</a>, <a href="<?= h($main) ?>/help/domains/expired-domains">how expiry works</a> and <a href="<?= h($main) ?>/help/domains/backorders">backorders for taken names</a>. Check any name with the free <a href="<?= h($main) ?>/whois">WHOIS lookup</a>, <a href="<?= h($main) ?>/tools/domain-history-checker">domain history checker</a> and <a href="<?= h($main) ?>/tools/domain-reputation-checker">domain reputation checker</a>.</p>
+    </div>
+    <div class="seo-faq">
+      <h2>Expired domains: questions and answers</h2>
+      <?php foreach (seo_faq() as [$q, $a]): ?>
+        <details><summary><?= h($q) ?></summary><p><?= h($a) ?></p></details>
+      <?php endforeach; ?>
+    </div>
+  </div>
+</section>
+
 <footer class="site-footer">
   <div class="container">
     <div class="cta">
@@ -257,9 +293,9 @@ $title = ['deleted' => 'Deleted domains available to register', 'expiring' => 'E
         <a class="logo" href="./"><span class="word"><span class="name">domacy</span><span class="dot"></span></span><span class="sub">Expired domains</span></a>
         <p>Domains, websites and email with the full price shown first.</p>
       </div>
-      <div><h4>Expired domains</h4><a href="?tab=deleted">Deleted domains</a><a href="?tab=expiring">Expiring auctions</a><a href="?tab=closeout">Closeouts</a></div>
+      <div><h4>Expired domains</h4><a href="./">Deleted domains</a><a href="?tab=expiring">Expiring auctions</a><a href="?tab=closeout">Closeouts</a></div>
       <div><h4>Domains</h4><a href="<?= h($main) ?>/search">Search domains</a><a href="<?= h($main) ?>/pricing">Domain prices</a><a href="<?= h($main) ?>/whois">WHOIS lookup</a><a href="<?= h($main) ?>/tools">Free domain tools</a><a href="<?= h($main) ?>/marketplace">Marketplace</a></div>
-      <div><h4>Help</h4><a href="<?= h($main) ?>/help">Help center</a><a href="mailto:admin@domacy.com">admin@domacy.com</a></div>
+      <div><h4>Help</h4><a href="<?= h($main) ?>/help">Help center</a><a href="<?= h($main) ?>/guides">Domain guides</a><a href="mailto:admin@domacy.com">admin@domacy.com</a></div>
       <div><h4>Your account</h4><a href="<?= h($main) ?>/account">My account</a><a href="<?= h($main) ?>/login">Sign in</a></div>
     </div>
     <div class="fbottom">

@@ -14,7 +14,7 @@ Domacy Expired Domains: deleted domains, expiring auctions and closeouts, update
 - Environment variables:
   - `CZDS_USERNAME`, `CZDS_PASSWORD`: ICANN CZDS login (required for the Deleted tab)
   - `CZDS_ZONES` (optional): comma list of zones to process, default `com,net,org,info,biz,xyz,...`
-  - `ALLOW_INDEXING=1` when you want Google to index the site (default: noindex)
+  - `ALLOW_INDEXING=0` to hide the site from search engines (default: indexed; robots.txt and sitemap.xml are generated)
   - `MAIN_SITE` (default `https://domacy.com`), `SITE_URL` (default `https://expired.domacy.com`)
 - The container runs cron itself (see `docker/crontab`). On first start it imports the GoDaddy files in the background (~2 min).
 - Logs: `data/logs/*.log`
