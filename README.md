@@ -6,6 +6,7 @@ Domacy Expired Domains: deleted domains, expiring auctions and closeouts, update
 |---|---|---|
 | Deleted domains | ICANN CZDS zone files (today's zone compared with yesterday's) | 07:30 |
 | Expiring auctions / Closeouts | GoDaddy Auctions free inventory files (Semrush authority, age, search volume) | 15:30 |
+| .ae domains | .ae has no zone file: names collected from SSL certificate logs (crt.sh) and the Tranco top-1M list, checked at whois.aeda.net.ae (pending delete / just released) | names hourly, WHOIS every 5 min |
 | Availability | RDAP lookups mark deleted names Available / Taken | every 15 min |
 
 ## Deploy (Coolify)

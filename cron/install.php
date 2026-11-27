@@ -49,6 +49,22 @@ $stmts = [
   status VARCHAR(12) NOT NULL DEFAULT 'unknown',
   checked_at DATETIME NULL
 )$engine",
+"CREATE TABLE IF NOT EXISTS ae_domains (
+  id $pk,
+  domain VARCHAR(253)$asc NOT NULL UNIQUE,
+  sld VARCHAR(190)$asc NOT NULL,
+  tld VARCHAR(63)$asc NOT NULL,
+  sld_len SMALLINT NOT NULL,
+  has_digits TINYINT NOT NULL DEFAULT 0,
+  has_hyphen TINYINT NOT NULL DEFAULT 0,
+  source VARCHAR(20) NOT NULL,
+  first_seen DATE NOT NULL,
+  status VARCHAR(12) NOT NULL DEFAULT 'unknown',
+  whois_status VARCHAR(120) NULL,
+  status_since DATE NULL,
+  dropped_on DATE NULL,
+  checked_at DATETIME NULL
+)$engine",
 "CREATE TABLE IF NOT EXISTS import_log (
   id $pk,
   source VARCHAR(40) NOT NULL,
@@ -60,6 +76,7 @@ $stmts = [
 $indexes = [
     'auctions' => ['list_type,tld', 'list_type,end_time', 'list_type,tf', 'list_type,semrush_as', 'list_type,price', 'list_type,sld_len', 'batch'],
     'deleted_domains' => ['dropped_on,tld', 'status', 'sld_len', 'tld'],
+    'ae_domains' => ['status,checked_at', 'checked_at', 'dropped_on', 'tld'],
 ];
 
 foreach ($stmts as $s) db()->exec($s);

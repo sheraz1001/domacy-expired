@@ -37,15 +37,17 @@ $rows = $stmt->fetchAll();
 $pages = max(1, min(500, (int)ceil($total / $perPage)));
 $tlds = top_tlds($tab);
 $isDel = $tab === 'deleted';
+$isAe = $tab === 'ae';
 $stats = site_stats();
 $dropDates = $isDel ? db()->query('SELECT DISTINCT dropped_on FROM deleted_domains ORDER BY dropped_on DESC LIMIT 14')->fetchAll(PDO::FETCH_COLUMN) : [];
 
 $lastUpd = $isDel ? ($stats['upd_deleted'] ?? null) : ($stats['upd_' . $tab] ?? null);
-$filtersOpen = (bool)array_filter(array_intersect_key($_GET, array_flip(['minlen','maxlen','nodigits','nohyphen','status','dropped','min_as','min_tf','min_bl','min_rd','min_age','max_price','ending','min_sv'])));
+$aeView = f('view', 'watch');
+$filtersOpen = (bool)array_filter(array_intersect_key($_GET, array_flip(['minlen','maxlen','nodigits','nohyphen','status','dropped','view','min_as','min_tf','min_bl','min_rd','min_age','max_price','ending','min_sv'])));
 
 function th(string $key, string $label, string $title = ''): string
 {
-    $cur = f('sort', current_tab() === 'deleted' ? 'dropped' : 'as');
+    $cur = f('sort', default_sort(current_tab()));
     $dir = f('dir');
     $next = ($cur === $key && $dir !== 'asc') ? 'asc' : 'desc';
     if ($cur !== $key && in_array($key, ['domain', 'len', 'price', 'end', 'tld'])) $next = 'asc';
@@ -147,7 +149,13 @@ $indexable = seo_indexable();
           <label>Length <input type="number" name="minlen" min="1" value="<?= h(f('minlen')) ?>" placeholder="min"> – <input type="number" name="maxlen" min="1" value="<?= h(f('maxlen')) ?>" placeholder="max"></label>
           <label><input type="checkbox" name="nodigits" value="1" <?= f('nodigits') ? 'checked' : '' ?>> No numbers</label>
           <label><input type="checkbox" name="nohyphen" value="1" <?= f('nohyphen') ? 'checked' : '' ?>> No hyphens</label>
-          <?php if ($isDel): ?>
+          <?php if ($isAe): ?>
+            <label>Show <select name="view">
+              <?php foreach (['watch' => 'Expiring + free now', 'pending' => 'Pending delete', 'released' => 'Just released', 'available' => 'All free names', 'all' => 'Everything tracked'] as $v => $l): ?>
+                <option value="<?= $v ?>" <?= $aeView === $v ? 'selected' : '' ?>><?= $l ?></option>
+              <?php endforeach; ?>
+            </select></label>
+          <?php elseif ($isDel): ?>
             <label><input type="checkbox" name="status" value="available" <?= f('status') === 'available' ? 'checked' : '' ?>> Available only</label>
             <label>Dropped <select name="dropped"><option value="">Any day</option>
               <?php foreach ($dropDates as $d): ?><option <?= f('dropped') === $d ? 'selected' : '' ?>><?= h($d) ?></option><?php endforeach; ?>
@@ -193,7 +201,9 @@ $indexable = seo_indexable();
       <table>
         <thead><tr>
           <?= th('domain', 'Domain') ?><?= th('len', 'Length', 'Name length without the ending') ?>
-          <?php if ($isDel): ?>
+          <?php if ($isAe): ?>
+            <?= th('tld', 'Ending') ?><?= th('status', 'Status') ?><?= th('since', 'Since', 'Date we first saw this status') ?><?= th('checked', 'Checked') ?><th></th>
+          <?php elseif ($isDel): ?>
             <?= th('tld', 'Ending') ?><?= th('dropped', 'Dropped') ?><?= th('status', 'Status') ?><th></th>
           <?php else: ?>
             <?= th('price', 'Price') ?><?= th('bids', 'Bids') ?><?= th('age', 'Age', 'Years since first registered') ?>
@@ -204,13 +214,25 @@ $indexable = seo_indexable();
         </tr></thead>
         <tbody>
         <?php if (!$rows): ?>
-          <tr><td colspan="12" class="empty"><?= $isDel && !$stats['deleted'] ? 'The first list of deleted domains appears the day after the first ICANN zone download. Meanwhile, browse expiring auctions and closeouts.' : 'No domains match these filters. Try a shorter keyword or clear some filters.' ?></td></tr>
+          <tr><td colspan="12" class="empty"><?= $isAe && !$stats['ae'] ? 'We are building the .ae watch list: names are collected from SSL certificate logs and top-site lists, then checked at the .ae registry. Expiring and freed names appear here as they are found.' : ($isDel && !$stats['deleted'] ? 'The first list of deleted domains appears the day after the first ICANN zone download. Meanwhile, browse expiring auctions and closeouts.' : 'No domains match these filters. Try a shorter keyword or clear some filters.') ?></td></tr>
         <?php endif; ?>
         <?php foreach ($rows as $r): $d = $r['domain']; [$sld, $tl] = split_domain($d); ?>
           <tr>
             <td class="dom"><?= h($sld) ?><span class="t">.<?= h($tl) ?></span></td>
             <td class="mut"><?= (int)$r['sld_len'] ?></td>
-            <?php if ($isDel): ?>
+            <?php if ($isAe):
+                $lbl = ['available' => $r['dropped_on'] ? 'Just released' : 'Available', 'pending' => 'Pending delete', 'registered' => 'Registered', 'unknown' => 'Not checked'][$r['status']] ?? $r['status'];
+                $cls = ['available' => 'available', 'pending' => 'unknown', 'registered' => 'registered'][$r['status']] ?? 'no_rdap'; ?>
+              <td class="mut">.<?= h($r['tld']) ?></td>
+              <td><span class="st st-<?= h($cls) ?>" title="<?= h($r['whois_status']) ?>"><?= h($lbl) ?></span></td>
+              <td class="mut"><?= h($r['dropped_on'] ?: $r['status_since']) ?></td>
+              <td class="mut"><?= h(ago($r['checked_at'])) ?></td>
+              <td class="links">
+                <a class="act ghost" href="https://web.archive.org/web/*/<?= h(rawurlencode($d)) ?>" target="_blank" rel="noopener nofollow">History</a>
+                <?php if ($r['status'] === 'available'): ?><a class="act" href="<?= h($main) ?>/search?q=<?= h(rawurlencode($d)) ?>">Register</a>
+                <?php else: ?><a class="act ghost" href="<?= h($main) ?>/whois?q=<?= h(rawurlencode($d)) ?>">WHOIS</a><?php endif; ?>
+              </td>
+            <?php elseif ($isDel): ?>
               <td class="mut">.<?= h($r['tld']) ?></td>
               <td class="mut"><?= h($r['dropped_on']) ?></td>
               <td><span class="st st-<?= h($r['status']) ?>"><?= h(['available' => 'Available', 'registered' => 'Taken', 'unknown' => 'Checking', 'no_rdap' => 'Unknown'][$r['status']] ?? $r['status']) ?></span></td>

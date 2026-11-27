@@ -37,6 +37,7 @@ function seo_title(string $tab, string $tld): string
     return match ($tab) {
         'expiring' => "Expiring {$e}domain auctions with authority and backlinks",
         'closeout' => "Expired {$e}domains for sale: closeouts from \$5",
+        'ae' => 'Expiring and deleted .ae domains (UAE): pending delete and just released',
         default => $tld !== '' ? "Expired .{$tld} domains: deleted names available to register" : 'Expired domains: deleted names available to register today',
     };
 }
@@ -47,6 +48,7 @@ function seo_description(string $tab, string $tld): string
     return match ($tab) {
         'expiring' => "Search expiring {$e}domain auctions free: Semrush authority, referring domains, age, search volume and price, updated every day.",
         'closeout' => "Buy expired {$e}domains from \$5: unsold closeout auctions with authority, age and backlinks. Free daily list, search and CSV export.",
+        'ae' => 'Free list of expiring .ae and .co.ae domains: names in pending delete at the UAE registry and names that have just become free to register.',
         default => "Free expired {$e}domain list: names deleted from the registry in the last 30 days, checked so you can see which are available to register now.",
     };
 }
@@ -57,6 +59,7 @@ function seo_h1(string $tab, string $tld): string
     return match ($tab) {
         'expiring' => "Expiring {$e}<span class=\"grad\">domain auctions</span>.",
         'closeout' => "Expired {$e}domains from <span class=\"grad\">\$5</span>.",
+        'ae' => 'Expiring <span class="grad">.ae domains</span>.',
         default => "Find <span class=\"grad\">expired {$e}domains</span>.",
     };
 }

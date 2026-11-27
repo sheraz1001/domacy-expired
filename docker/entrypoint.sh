@@ -22,5 +22,8 @@ if grep -q '"CZDS_PASSWORD"' data/env.json; then
   ( sleep 120; su -s /bin/sh www-data -c "flock -n /tmp/czds.lock php cron/czds_deleted.php >> data/logs/czds.log 2>&1" ) &
 fi
 
+# Start collecting .ae names straight away
+( sleep 60; su -s /bin/sh www-data -c "flock -n /tmp/ae_seed.lock php cron/ae_seed.php >> data/logs/ae.log 2>&1" ) &
+
 cron
 exec apache2-foreground
