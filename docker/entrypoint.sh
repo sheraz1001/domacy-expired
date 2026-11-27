@@ -16,5 +16,11 @@ if [ ! -f data/.first_import_done ]; then
   su -s /bin/sh www-data -c "flock -n /tmp/godaddy.lock php cron/import_godaddy.php >> data/logs/godaddy.log 2>&1 && touch data/.first_import_done" &
 fi
 
+# If ICANN login is set, take today's zone snapshots now (skips zones already done today),
+# so the first "Deleted" list appears one day sooner after a fresh deploy.
+if grep -q '"CZDS_PASSWORD"' data/env.json; then
+  ( sleep 120; su -s /bin/sh www-data -c "flock -n /tmp/czds.lock php cron/czds_deleted.php >> data/logs/czds.log 2>&1" ) &
+fi
+
 cron
 exec apache2-foreground
