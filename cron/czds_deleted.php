@@ -85,9 +85,17 @@ function process_zone(string $tld, ?string $url, string $token, string $dir, str
             $gz = $local;
         } else {
             if (!$url) { logmsg("[$tld] not approved yet - skipping"); return; }
-            logmsg("[$tld] downloading zone ...");
-            $r = http_get($url, ["Authorization: Bearer $token"], "$gz.part", 6 * 3600);
-            if ($r['code'] !== 200) { @unlink("$gz.part"); throw new RuntimeException("download HTTP {$r['code']} {$r['error']}"); }
+            // Download with integrity check: a cut-off transfer gives a truncated .gz,
+            // which would silently produce a tiny name list. Retry up to 3 times.
+            for ($try = 1; ; $try++) {
+                logmsg("[$tld] downloading zone" . ($try > 1 ? " (attempt $try)" : '') . ' ...');
+                $r = http_get($url, ["Authorization: Bearer $token"], "$gz.part", 6 * 3600);
+                $ok = $r['code'] === 200 && $r['error'] === '' && gzip_ok("$gz.part");
+                if ($ok) break;
+                @unlink("$gz.part");
+                if ($try >= 3) throw new RuntimeException("download failed or incomplete after 3 tries (HTTP {$r['code']} {$r['error']})");
+                sleep(30);
+            }
             rename("$gz.part", $gz);
         }
         logmsg("[$tld] extracting second-level names ...");
@@ -97,7 +105,7 @@ function process_zone(string $tld, ?string $url, string $token, string $dir, str
             "gzip -dc %s | awk -v n=%d '{o=tolower($1); if (gsub(/\\./,\".\",o)==n && o ~ /\\.%s\\.$/) print substr(o,1,length(o)-1)}' | LC_ALL=C sort -u -S 25%% -T %s > %s",
             escapeshellarg($gz), $dots, preg_quote($tld, '/'), escapeshellarg($dir), escapeshellarg("$list.part")
         );
-        exec($cmd, $out, $rc);
+        exec('bash -o pipefail -c ' . escapeshellarg($cmd), $out, $rc);
         if ($rc !== 0) throw new RuntimeException("extract failed (rc=$rc)");
         rename("$list.part", $list);
         if (!$local) @unlink($gz);
@@ -146,6 +154,12 @@ function process_zone(string $tld, ?string $url, string $token, string $dir, str
     @unlink($prev);
     @unlink($dropped);
     foreach (glob("$dir/$tld.*.txt") as $f) if ($f !== $list) @unlink($f);
+}
+
+function gzip_ok(string $f): bool
+{
+    exec('gzip -t ' . escapeshellarg($f) . ' 2>/dev/null', $o, $rc);
+    return $rc === 0;
 }
 
 function line_count(string $f): int
