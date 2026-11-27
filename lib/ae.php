@@ -62,6 +62,9 @@ function ae_whois(string $domain): array
     $resp = stream_get_contents($f);
     fclose($f);
     if ($resp === false || trim($resp) === '') return ['state' => 'error', 'raw' => 'empty response'];
+    if (stripos($resp, 'BLACKLISTED') !== false || stripos($resp, 'exceeded the query limit') !== false) {
+        return ['state' => 'blocked', 'raw' => 'rate limit'];
+    }
     if (stripos($resp, 'No Data Found') !== false) return ['state' => 'available', 'raw' => 'No Data Found'];
     if (stripos($resp, 'Domain Name:') === false) return ['state' => 'error', 'raw' => substr(trim($resp), 0, 120)];
 

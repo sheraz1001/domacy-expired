@@ -8,6 +8,14 @@ require __DIR__ . '/../lib/ae.php';
 cli_only();
 @set_time_limit(0);
 
+// aeDA blacklists an IP after ~20 quick queries. If that happens we pause, and the pause
+// doubles each time (6h, 12h, 24h ... max 48h) until a run gets through cleanly.
+$pauseFile = data_dir() . '/ae_whois_pause.json';
+$pause = is_file($pauseFile) ? (json_decode(file_get_contents($pauseFile), true) ?: []) : [];
+if (($pause['until'] ?? 0) > time()) {
+    exit; // still paused (logged when the pause started)
+}
+
 $limit = max(1, (int)config('ae_whois_per_run'));
 $delay = max(0, (int)config('ae_whois_delay_ms')) * 1000;
 $now = gmdate('Y-m-d H:i:s');
@@ -35,6 +43,12 @@ $errorsInRow = 0;
 
 foreach ($picks as $r) {
     $res = ae_whois($r['domain']);
+    if ($res['state'] === 'blocked') {
+        $hours = min(48, max(6, ($pause['hours'] ?? 3) * 2));
+        file_put_contents($pauseFile, json_encode(['until' => time() + $hours * 3600, 'hours' => $hours]));
+        logmsg("aeDA WHOIS rate limit hit: pausing .ae checks for $hours hours");
+        break;
+    }
     if ($res['state'] === 'error') {
         $stats['error']++;
         if (++$errorsInRow >= 5) { logmsg('aeDA WHOIS not answering (' . $res['raw'] . '), stopping this run'); break; }
@@ -56,7 +70,10 @@ foreach ($picks as $r) {
     usleep($delay);
 }
 
-if (array_sum($stats) - $stats['error'] > 0) clear_cache();
+if (array_sum($stats) - $stats['error'] > 0) {
+    clear_cache();
+    if (!empty($pause) && ($pause['until'] ?? 0) <= time()) @unlink($pauseFile); // got through: reset backoff
+}
 db()->prepare('INSERT INTO import_log (source, rows_count, ran_at) VALUES (?,?,?)')->execute(['ae_whois', count($picks), $now]);
 logmsg(sprintf('Checked %d .ae names: %d registered, %d pending delete, %d available (%d newly released), %d errors',
     count($picks), $stats['registered'], $stats['pending'], $stats['available'], $stats['released'], $stats['error']));

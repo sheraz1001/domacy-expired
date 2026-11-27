@@ -40,8 +40,10 @@ return [
     'rdap_delay_ms' => (int)$env('RDAP_DELAY_MS', 0),
     // .ae watch list (aeDA WHOIS has no zone file; names come from SSL logs + top-sites list)
     'ae_whois_host' => $env('AE_WHOIS_HOST', 'whois.aeda.net.ae'),
-    'ae_whois_per_run' => (int)$env('AE_WHOIS_PER_RUN', 180),   // runs every 5 min
-    'ae_whois_delay_ms' => (int)$env('AE_WHOIS_DELAY_MS', 1500),
+    // aeDA blacklists fast clients (~20 quick queries). Default: 4 lookups per 5-minute run,
+    // 70 s apart = ~1,150 a day. Raise slowly with AE_WHOIS_PER_RUN / AE_WHOIS_DELAY_MS if it holds.
+    'ae_whois_per_run' => (int)$env('AE_WHOIS_PER_RUN', 4),
+    'ae_whois_delay_ms' => (int)$env('AE_WHOIS_DELAY_MS', 70000),
     'ae_crt_queries_per_run' => (int)$env('AE_CRT_QUERIES_PER_RUN', 8),
     'deleted_keep_days' => (int)$env('DELETED_KEEP_DAYS', 30),
     'cron_key' => '',
