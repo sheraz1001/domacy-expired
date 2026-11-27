@@ -1,6 +1,6 @@
 <?php
 // Grows the .ae watch list. .ae has no public zone file, so names are collected from:
-//  1. SSL certificate logs (crt.sh), swept in small prefix pieces ("a%.ae", "ab%.ae" ...)
+//  1. SSL certificate logs (crt.sh): .ae sub-zones daily + keyword searches that grow over time
 //  2. The Tranco top-1M sites list (once a day)
 // Runs hourly:  php cron/ae_seed.php
 require __DIR__ . '/../lib/bootstrap.php';
@@ -37,50 +37,55 @@ if (@file_get_contents($stamp) !== gmdate('Y-m-d')) {
     }
 }
 
-// --- 2. crt.sh prefix sweep ---
-// Queue of prefixes to query. A query that is too big (crt.sh 502/timeout) is split into longer prefixes.
-$qfile = data_dir() . '/ae_crt_queue.json';
-$queue = is_file($qfile) ? (json_decode(file_get_contents($qfile), true) ?: []) : [];
-$chars = array_merge(range('a', 'z'), range('0', '9'));
-if (!$queue) {
-    $queue = $chars; // start a new full sweep
-    logmsg('crt.sh: starting a new sweep');
+// --- 2. SSL certificate logs (crt.sh) ---
+// crt.sh can't list all of .ae at once, so we search it in two ways:
+//  a) once a day, every public sub-zone ("%.co.ae", "%.net.ae" ...)
+//  b) every run, a few keywords ("dubai", "perfume" ...); any word found inside a new
+//     .ae name is added to the keyword list, so coverage keeps growing.
+$state = data_dir() . '/ae_crt_state.json';
+$st = is_file($state) ? (json_decode(file_get_contents($state), true) ?: []) : [];
+$st += ['queue' => [], 'done' => [], 'zones_date' => ''];
+
+$queries = [];
+if ($st['zones_date'] !== gmdate('Y-m-d')) {
+    foreach (AE_SECOND_LEVEL as $z) $queries[] = "%.$z.ae";
+    $st['zones_date'] = gmdate('Y-m-d');
 }
-
+if (!$st['queue']) {
+    $st['queue'] = array_values(array_diff(ae_seed_keywords(), $st['done']));
+    if (!$st['queue']) { $st['done'] = []; $st['queue'] = ae_seed_keywords(); logmsg('crt.sh: keyword list finished, starting again'); }
+}
 $perRun = max(1, (int)config('ae_crt_queries_per_run'));
-for ($i = 0; $i < $perRun && $queue; $i++) {
-    $prefix = array_shift($queue);
-    $url = 'https://crt.sh/?q=' . rawurlencode($prefix . '%.ae') . '&output=json';
-    $r = http_get($url, ['Accept: application/json'], null, 150);
-    $json = $r['code'] === 200 ? json_decode((string)$r['body'], true) : null;
+for ($i = 0; $i < $perRun && $st['queue']; $i++) $queries[] = array_shift($st['queue']);
 
-    if (!is_array($json)) {
-        if (strlen($prefix) < 4) {
-            // Too big: split into longer prefixes and try those later
-            foreach ($chars as $c) $queue[] = $prefix . $c;
-            foreach (['-', '.'] as $c) if (strlen($prefix) >= 1) $queue[] = $prefix . $c;
-            logmsg("crt.sh: '$prefix' too big (HTTP {$r['code']}), split into " . (count($chars) + 2) . ' pieces');
-        } else {
-            logmsg("crt.sh: '$prefix' failed (HTTP {$r['code']}), skipped");
-        }
-        sleep(10);
-        continue;
-    }
+foreach ($queries as $q) {
+    $r = http_get('https://crt.sh/?q=' . rawurlencode($q) . '&output=json', ['Accept: application/json'], null, 180);
+    $json = $r['code'] === 200 ? json_decode((string)$r['body'], true) : null;
+    if (!str_starts_with($q, '%')) $st['done'][] = $q;
+    if (!is_array($json)) { logmsg("crt.sh '$q': no data (HTTP {$r['code']})"); sleep(5); continue; }
     $names = [];
     foreach ($json as $row) {
-        foreach ([$row['common_name'] ?? '', $row['name_value'] ?? ''] as $field) {
-            foreach (preg_split('/\s+/', (string)$field) as $host) {
-                if ($host !== '' && ($d = ae_registrable($host))) $names[] = $d;
-            }
+        foreach (preg_split('/\s+/', ($row['common_name'] ?? '') . ' ' . ($row['name_value'] ?? '')) as $host) {
+            if ($host !== '' && ($d = ae_registrable($host))) $names[$d] = true;
         }
     }
+    $names = array_keys($names);
     $n = ae_add($names, 'ssl');
     $total += $n;
-    logmsg("crt.sh '$prefix': " . count($json) . ' certs, ' . count(array_unique($names)) . " .ae names, $n new");
-    sleep(10); // be polite to crt.sh
+    // Learn new keywords from the names we found
+    $known = array_flip(array_merge($st['done'], $st['queue']));
+    foreach ($names as $d) {
+        foreach (preg_split('/[-0-9]+/', substr($d, 0, strpos($d, '.'))) as $word) {
+            if (strlen($word) >= 4 && strlen($word) <= 20 && !isset($known[$word])) { $st['queue'][] = $word; $known[$word] = true; }
+        }
+    }
+    logmsg("crt.sh '$q': " . count($json) . ' certs, ' . count($names) . " .ae names, $n new");
+    sleep(5); // be polite to crt.sh
 }
-file_put_contents($qfile, json_encode(array_values($queue)));
+$st['done'] = array_values(array_unique($st['done']));
+file_put_contents($state, json_encode($st));
+@unlink(data_dir() . '/ae_crt_queue.json');
 
 $count = (int)db()->query('SELECT COUNT(*) FROM ae_domains')->fetchColumn();
 db()->prepare('INSERT INTO import_log (source, rows_count, ran_at) VALUES (?,?,?)')->execute(['ae_seed', $total, gmdate('Y-m-d H:i:s')]);
-logmsg("Watch list: $count .ae names ($total new this run, " . count($queue) . ' prefixes left in sweep)');
+logmsg("Watch list: $count .ae names ($total new this run, " . count($st['queue']) . ' keywords queued)');

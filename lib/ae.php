@@ -72,3 +72,28 @@ function ae_whois(string $domain): array
     $pending = preg_match('/pendingDelete|redemption|expired|hold|suspend|quarantine|pendingRestore/i', $raw);
     return ['state' => $pending ? 'pending' : 'registered', 'raw' => $raw];
 }
+
+/** Starting keywords for crt.sh searches. More are learned from every .ae name found. */
+function ae_seed_keywords(): array
+{
+    $w = 'dubai abudhabi sharjah ajman fujairah rasalkhaimah rak ummalquwain alain uae emirates emirati gulf arab arabia khaleej
+    alnoor almadina alwasl jumeirah deira bur marina jebel jafza difc dmcc dafza kizad masdar khalifa zayed rashid maktoum nahyan
+    business trading trade tradings group holding holdings company corp general enterprises international global services solutions
+    consult consulting consultancy advisory accounting audit tax legal law lawyers advocates notary insurance finance capital invest
+    investment bank exchange money gold jewellery jewelry diamond watches perfume perfumes oud attar fragrance cosmetics beauty salon
+    spa clinic medical dental doctor hospital health pharmacy care wellness fitness gym yoga sports academy school college university
+    education training institute learning kids nursery travel tours tourism holidays hotel hotels resort apartments rent rental cars
+    car auto motors garage parts tyres rentacar limousine transport logistics shipping cargo freight courier delivery express marine
+    yacht boat fishing real estate realestate property properties homes villa villas building construction contracting contractors
+    engineering technical maintenance cleaning facility fm security fire safety electrical electro mechanical plumbing ac cooling
+    aluminium steel glass wood furniture interior interiors design designs decor art gallery studio photo media advertising marketing
+    digital tech technology techno it software web app apps cloud data network systems smart ai cyber computer mobile phone telecom
+    food foods restaurant cafe coffee bakery sweets chocolate dates catering kitchen grill shawarma burger pizza juice water fresh
+    organic market mart supermarket store shop shopping mall online fashion style boutique abaya kandura textiles fabrics shoes bags
+    gifts flowers events wedding party printing press packaging plastic paper chemicals oil gas energy solar power petroleum industries
+    industrial factory manufacturing equipment machinery tools hardware supply supplies supplier trading distribution import export
+    agency agencies broker brokers recruitment jobs careers hr manpower visa typing documents clearing pro government smart
+    halal islamic quran masjid mosque charity foundation society club association council center centre hub zone point plus pro
+    royal golden silver star sun moon pearl palm falcon desert oasis sand camel horse najm noor amal salam hayat baraka faisal ahmed mohammed';
+    return array_values(array_unique(array_filter(preg_split('/\s+/', $w))));
+}
