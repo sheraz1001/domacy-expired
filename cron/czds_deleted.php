@@ -106,14 +106,23 @@ function process_zone(string $tld, ?string $url, string $token, string $dir, str
             if (!$url) { logmsg("[$tld] not approved yet - skipping"); return; }
             // Download with integrity check: a cut-off transfer gives a truncated .gz,
             // which would silently produce a tiny name list. Retry up to 3 times.
+            // ICANN often drops the connection mid-file, so resume from where it stopped (up to 10 times).
+            @unlink("$gz.part");
             for ($try = 1; ; $try++) {
-                logmsg("[$tld] downloading zone" . ($try > 1 ? " (attempt $try)" : '') . ' ...');
-                $r = http_get($url, ["Authorization: Bearer $token"], "$gz.part", 6 * 3600);
-                $ok = $r['code'] === 200 && $r['error'] === '' && gzip_ok("$gz.part");
-                if ($ok) break;
-                @unlink("$gz.part");
-                if ($try >= 3) throw new RuntimeException("download failed or incomplete after 3 tries (HTTP {$r['code']} {$r['error']})");
-                sleep(30);
+                clearstatcache();
+                $have = is_file("$gz.part") ? filesize("$gz.part") : 0;
+                logmsg("[$tld] downloading zone" . ($have ? ' (resuming at ' . round($have / 1048576, 1) . ' MB)' : '') . ' ...');
+                $r = http_get($url, ["Authorization: Bearer $token"], "$gz.part", 6 * 3600, $have > 0);
+                if ($have > 0 && $r['code'] === 200) {
+                    // Server ignored the resume request and sent the whole file again: start clean
+                    @unlink("$gz.part");
+                    $r = http_get($url, ["Authorization: Bearer $token"], "$gz.part", 6 * 3600);
+                }
+                $complete = in_array($r['code'], [200, 206], true) && $r['error'] === '';
+                if ($complete && gzip_ok("$gz.part")) break;
+                if ($complete) @unlink("$gz.part"); // finished but corrupt: start over
+                if ($try >= 10) { @unlink("$gz.part"); throw new RuntimeException("download failed after 10 tries (HTTP {$r['code']} {$r['error']})"); }
+                sleep(15);
             }
             rename("$gz.part", $gz);
         }

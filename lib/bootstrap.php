@@ -96,10 +96,11 @@ function bulk_upsert(string $table, array $cols, array $rows, array $unique): vo
     db()->prepare($sql)->execute($params);
 }
 
-function http_get(string $url, array $headers = [], ?string $saveTo = null, int $timeout = 60): array
+function http_get(string $url, array $headers = [], ?string $saveTo = null, int $timeout = 60, bool $resume = false): array
 {
     $ch = curl_init($url);
     $fh = null;
+    $offset = ($resume && $saveTo && is_file($saveTo)) ? filesize($saveTo) : 0;
     $opts = [
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_HTTPHEADER => $headers,
@@ -108,8 +109,9 @@ function http_get(string $url, array $headers = [], ?string $saveTo = null, int 
         CURLOPT_TIMEOUT => $timeout,
     ];
     if ($saveTo) {
-        $fh = fopen($saveTo, 'wb');
+        $fh = fopen($saveTo, $offset ? 'ab' : 'wb');
         $opts[CURLOPT_FILE] = $fh;
+        if ($offset) $opts[CURLOPT_RANGE] = $offset . "-"; // continue a cut-off download
     } else {
         $opts[CURLOPT_RETURNTRANSFER] = true;
     }
