@@ -9,10 +9,26 @@ require __DIR__ . '/../lib/bootstrap.php';
 cli_only();
 @set_time_limit(0);
 
-$args = getopt('', ['zone:', 'local:']);
+$args = getopt('', ['zone:', 'local:', 'part:', 'of:']);
 $zones = !empty($args['zone']) ? [strtolower($args['zone'])] : config('czds_zones');
 $dir = data_dir('zones');
 $today = gmdate('Y-m-d');
+$workers = max(1, (int)config('czds_workers'));
+$isChild = isset($args['part']);
+
+// Parent: split the work over several processes so zone files download in parallel
+// (ICANN serves each download slowly, so 4 at once is ~4x faster overall).
+if (!$isChild && $workers > 1 && empty($args['zone']) && empty($args['local'])) {
+    $procs = [];
+    for ($i = 0; $i < $workers; $i++) {
+        $cmd = [PHP_BINARY, __FILE__, "--part=$i", "--of=$workers"];
+        $procs[] = proc_open($cmd, [1 => STDOUT, 2 => STDERR], $pipes);
+        sleep(2);
+    }
+    foreach ($procs as $p) if (is_resource($p)) proc_close($p);
+    housekeeping();
+    exit(0);
+}
 
 $links = [];
 if (empty($args['local'])) {
@@ -22,7 +38,7 @@ if (empty($args['local'])) {
     foreach (json_decode($r['body'], true) ?: [] as $url) {
         $links[strtolower(basename($url, '.zone'))] = $url;
     }
-    logmsg('Approved zones available: ' . count($links));
+    if (!$isChild || (int)$args['part'] === 0) logmsg('Approved zones available: ' . count($links));
 }
 
 if ($zones === ['all']) {
@@ -32,22 +48,25 @@ if ($zones === ['all']) {
     sort($all);
     $zones = array_values(array_unique(array_merge(array_intersect($first, $all), $all)));
 }
-$pending = array_filter($zones, fn($t) => !is_file("$dir/$t.$today.txt") && (empty($links) || isset($links[$t])));
-if (!$pending) { logmsg('All approved zones already done today.'); exit(0); }
+$pending = array_values(array_filter($zones, fn($t) => !is_file("$dir/$t.$today.txt") && (empty($links) || isset($links[$t]))));
+// Zones that already have an earlier snapshot go first: they produce deleted names right away
+$hasPrev = fn($t) => (bool)array_filter(glob("$dir/$t.*.txt") ?: [], fn($f) => !str_ends_with($f, ".$today.txt"));
+usort($pending, fn($a, $b) => $hasPrev($b) <=> $hasPrev($a)); // stable sort keeps popularity order
+if ($isChild) {
+    $part = (int)$args['part']; $of = max(1, (int)$args['of']);
+    $pending = array_values(array_filter($pending, fn($t, $i) => $i % $of === $part, ARRAY_FILTER_USE_BOTH));
+}
+if (!$pending) { if (!$isChild) logmsg('All approved zones already done today.'); exit(0); }
 foreach ($pending as $tld) {
+    if (gmdate('Y-m-d') !== $today) { logmsg('New UTC day started - stopping so the new day\'s run can begin.'); break; }
     try {
         process_zone($tld, $links[$tld] ?? null, $token ?? '', $dir, $today, $args['local'] ?? null);
     } catch (Throwable $e) {
         logmsg("[$tld] ERROR: " . $e->getMessage());
     }
 }
-
-// Housekeeping
-$keep = (int)config('deleted_keep_days');
-$n = db()->prepare('DELETE FROM deleted_domains WHERE dropped_on < ?');
-$n->execute([gmdate('Y-m-d', strtotime("-$keep days"))]);
-logmsg("Removed {$n->rowCount()} deleted-domain rows older than $keep days.");
-clear_cache();
+if (!$isChild) housekeeping();
+exit(0);
 
 function czds_login(): string
 {
@@ -102,7 +121,7 @@ function process_zone(string $tld, ?string $url, string $token, string $dir, str
         // Keep only "<label>.<tld>." owner names, lowercase, unique, sorted (C locale for comm).
         $dots = substr_count($tld, '.') + 2;
         $cmd = sprintf(
-            "gzip -dc %s | awk -v n=%d '{o=tolower($1); if (gsub(/\\./,\".\",o)==n && o ~ /\\.%s\\.$/) print substr(o,1,length(o)-1)}' | LC_ALL=C sort -u -S 25%% -T %s > %s",
+            "gzip -dc %s | awk -v n=%d '{o=tolower($1); if (gsub(/\\./,\".\",o)==n && o ~ /\\.%s\\.$/) print substr(o,1,length(o)-1)}' | LC_ALL=C sort -u -S 10%% -T %s > %s",
             escapeshellarg($gz), $dots, preg_quote($tld, '/'), escapeshellarg($dir), escapeshellarg("$list.part")
         );
         exec('bash -o pipefail -c ' . escapeshellarg($cmd), $out, $rc);
@@ -165,4 +184,13 @@ function gzip_ok(string $f): bool
 function line_count(string $f): int
 {
     return (int)trim((string)shell_exec('wc -l < ' . escapeshellarg($f)));
+}
+
+function housekeeping(): void
+{
+    $keep = (int)config('deleted_keep_days');
+    $n = db()->prepare('DELETE FROM deleted_domains WHERE dropped_on < ?');
+    $n->execute([gmdate('Y-m-d', strtotime("-$keep days"))]);
+    logmsg("Removed {$n->rowCount()} deleted-domain rows older than $keep days.");
+    clear_cache();
 }

@@ -35,6 +35,7 @@ return [
     'godaddy_skip_adult' => true,
 
     // 'all' = every zone ICANN has approved for this account
+    'czds_workers' => (int)$env('CZDS_WORKERS', 4),         // parallel zone downloads
     'rdap_per_run' => (int)$env('RDAP_PER_RUN', 4000),      // names checked per run (runs every 5 min)
     'rdap_parallel' => (int)$env('RDAP_PARALLEL', 12),      // requests in flight at once
     'rdap_delay_ms' => (int)$env('RDAP_DELAY_MS', 0),
